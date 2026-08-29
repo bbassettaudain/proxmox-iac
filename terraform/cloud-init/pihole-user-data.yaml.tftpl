@@ -1,0 +1,65 @@
+# cloud-config
+# Template rendered via templatefile() in vm.tf 
+fqdn: ${host}.hole
+prefer_fqdn_over_hostname: true
+create_hostname_file: true
+hostname: ${host}
+timezone: America/Chicago
+package_update: true
+packages:
+  - net-tools
+  - curl
+  - git
+
+write_files:
+  - path: /root/.ssh/id_ed25519_deploy
+    permissions: '0600'
+    owner: root:root
+    content: |
+      ${indent(6, deploy_key)}
+  - path: /root/.ssh/id_ed25519_tailscale_deploy
+    permissions: '0600'
+    owner: root:root
+    content: |
+      ${indent(6, tailscale_deploy_key)}
+  - path: /root/.ssh/config
+    permissions: '0600'
+    owner: root:root
+    content: |
+      Host github.com 
+        Hostname github.com
+        IdentityFile /root/.ssh/id_ed25519_deploy
+      Host github.com-tailscale
+        Hostname github.com
+        IdentityFile /root/.ssh/id_ed25519_tailscale_deploy
+  - path: /root/config/.env
+    permissions: '0600'
+    owner: root:root
+    content: |
+      ${indent(6, env_file_content)}
+  - path: /root/.ssh/known_hosts
+    permissions: '0644'
+    owner: root:root
+    # GitHub's published host key (docs.github.com/.../githubs-ssh-key-fingerprints)
+    content: |
+      github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+
+runcmd:
+  - mkdir -p /opt/apps
+  - >-
+    GIT_SSH_COMMAND="ssh -o IdentitiesOnly=yes -o UserKnownHostsFile=/root/.ssh/known_hosts"
+    git clone git@github.com:bbassettaudain/pihole.git /opt/apps/pihole
+  - >-
+    GIT_SSH_COMMAND="ssh -o IdentitiesOnly=yes -o UserKnownHostsFile=/root/.ssh/known_hosts"
+    git clone git@github.com-tailscale:bbassettaudain/tailscale.git /opt/apps/tailscale
+  - cd /opt/apps/tailscale
+  - chmod +x /opt/apps/tailscale/install.sh
+  - /opt/apps/tailscale/install.sh
+  - cp --preserve=ownership /root/config/.env /opt/apps/tailscale/.env
+  - docker compose up -d
+  - cd /opt/apps/pihole
+  - docker compose pull
+  - sudo systemctl disable systemd-resolved
+  - sudo systemctl stop systemd-resolved
+  - docker compose up -d 
+  - echo "done" > /tmp/cloud-config.done

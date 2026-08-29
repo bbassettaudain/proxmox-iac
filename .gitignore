@@ -1,0 +1,19 @@
+# Terraform / OpenTofu
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Plan output artifacts
+*.tfplan
+
+# Secrets / local env
+.env
+*.pem
+*.key
+terraform/secrets/
+
+# Temporary and In Progress Files
+.gitlab-ci.yml
+README.md
