@@ -2,13 +2,8 @@
 #
 # Modularize these VMs and their cloudinit templates. 
 
-moved {
-  to   = proxmox_virtual_environment_vm.debian13
-  from = proxmox_virtual_environment_vm.example
-}
-
 resource "proxmox_virtual_environment_vm" "debian13" {
-  name      = "debian13-vm1"
+  name      = "streaming"
   node_name = var.proxmox_node
 
   clone {
@@ -43,54 +38,15 @@ resource "proxmox_virtual_environment_vm" "debian13" {
   #     }
   #   }
   tags = [
-      "testing", "aiostreams", "stremio-exit-node", "youtubio"
+    "testing", "aiostreams", "streaming-exit-node", "youtubio"
   ]
   lifecycle {
     prevent_destroy = true
   }
 }
 
-resource "proxmox_virtual_environment_vm" "pihole_deb13_secondary" {
-  name      = "pihole.testing.secondary"
-  node_name = var.proxmox_node
-
-  clone {
-    vm_id = var.template_vmid
-    full  = true
-  }
-
-  cpu {
-    cores = 2
-  }
-
-  memory {
-    dedicated = 4096
-  }
-
-  network_device {
-    bridge = "vmbr0"
-    model  = "virtio"
-    # vlan_id = 100  # Homelab VLAN
-  }
-
-  lifecycle {
-    prevent_destroy = true
-    ignore_changes = [ initialization["user_data_file_id"] ]
-  }
-  
-  initialization {
-    datastore_id = "local-zfs"
-    ip_config {
-      ipv4 {
-        address = "10.10.100.54/24"
-        gateway = "10.10.100.1"
-      }
-    }
-    user_data_file_id = proxmox_virtual_environment_file.user_data_cloud_config[1].id
-  }
-}
-resource "proxmox_virtual_environment_vm" "debian13-testing" {
-  name      = "pihole.testing"
+resource "proxmox_virtual_environment_vm" "pihole_primary" {
+  name      = "pihole"
   node_name = var.proxmox_node
 
   clone {
@@ -115,7 +71,7 @@ resource "proxmox_virtual_environment_vm" "debian13-testing" {
   lifecycle {
     prevent_destroy = true
   }
-  
+
   initialization {
     datastore_id = "local-zfs"
     ip_config {
@@ -127,12 +83,56 @@ resource "proxmox_virtual_environment_vm" "debian13-testing" {
     # user_data_file_id = proxmox_virtual_environment_file.user_data_cloud_config.id
   }
   tags = [
-      "testing", "pihole", "dns"
+    "pihole", "dns", "infra"
   ]
 }
 
+resource "proxmox_virtual_environment_vm" "pihole_secondary" {
+  name      = "pihole.secondary"
+  node_name = var.proxmox_node
+
+  clone {
+    vm_id = var.template_vmid
+    full  = true
+  }
+
+  cpu {
+    cores = 2
+  }
+
+  memory {
+    dedicated = 4096
+  }
+
+  network_device {
+    bridge = "vmbr0"
+    model  = "virtio"
+    # vlan_id = 100  # Homelab VLAN
+  }
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [initialization["user_data_file_id"]]
+  }
+
+  initialization {
+    datastore_id = "local-zfs"
+    ip_config {
+      ipv4 {
+        address = "10.10.100.54/24"
+        gateway = "10.10.100.1"
+      }
+    }
+    user_data_file_id = proxmox_virtual_environment_file.user_data_cloud_config[1].id
+  }
+  tags = [
+    "pihole", "dns", "infra"
+  ]
+}
+
+
 resource "proxmox_virtual_environment_file" "user_data_cloud_config" {
-  count = length(local.pihole_hosts)
+  count        = length(local.pihole_hosts)
   content_type = "snippets"
   datastore_id = "local"
   node_name    = var.proxmox_node
@@ -140,10 +140,10 @@ resource "proxmox_virtual_environment_file" "user_data_cloud_config" {
   source_raw {
     file_name = "pihole-user-data-${count.index}.yaml"
     data = templatefile("${path.module}/cloud-init/pihole-user-data.yaml.tftpl", {
-      deploy_key = nonsensitive(local.pihole_sops["pihole"]["deploy-key-private"])
+      deploy_key           = nonsensitive(local.pihole_sops["pihole"]["deploy-key-private"])
       tailscale_deploy_key = nonsensitive(local.pihole_sops["tailscale"]["deploy-key-private"])
-      env_file_content = nonsensitive(local.env_file_content)
-      host = local.pihole_hosts[count.index]
+      env_file_content     = nonsensitive(local.env_file_content)
+      host                 = local.pihole_hosts[count.index]
     })
   }
 }
@@ -174,7 +174,7 @@ resource "proxmox_virtual_environment_file" "user_data_cloud_config" {
 #   lifecycle {
 #     prevent_destroy = true
 #   }
-  
+
 #   initialization {
 #     datastore_id = "local-zfs"
 #     ip_config {

@@ -28,12 +28,12 @@ terraform {
 }
 
 provider "proxmox" {
-  endpoint  = ephemeral.sops_file.proxmox.data["api_url"] # var.proxmox_api_url
+  endpoint  = ephemeral.sops_file.proxmox.data["api_url"]   # var.proxmox_api_url
   api_token = ephemeral.sops_file.proxmox.data["api_token"] # var.proxmox_api_token
-  insecure  = true # install a real cert
+  insecure  = true                                          # install a real cert
   ssh {
     agent    = true
-    username = ephemeral.sops_file.proxmox.data["user"] # var.proxmox_user
+    username = ephemeral.sops_file.proxmox.data["user"]     # var.proxmox_user
     password = ephemeral.sops_file.proxmox.data["password"] # var.proxmox_password
   }
 }
